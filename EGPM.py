@@ -28,26 +28,29 @@ class EGPM:
         # exit(1)
 
         # eta: step size
-        self.eta = 0.0009
+        self.eta = 0.001
         # U: max l1 norm of weight vectors
         self.U = 10.4
         self.wm = self.wp = 1.0 / (2 * self.N) * np.ones(self.N)
 
 
+    # fit linear model to batch data
     def batch_algo(self):
         lr = LinearRegression()
         X = self.data.iloc[:, range(self.N - 1)]
         y_actual = self.data.iloc[:, self.N - 1]
         model = lr.fit(X, y_actual)
+        print lr.coef_
 
         y_pred = model.predict(X)
-        print mean_squared_error(y_actual, y_pred)
-
+        batch_error = mean_squared_error(y_actual, y_pred)
+        return batch_error
 
     def predicted_price(self, house_feature):
         house_feature = house_feature.iloc[:self.N]
         return np.dot((self.wp - self.wm), house_feature)
 
+    # wt updates: Same as in Kivinen and Warmuth
     def update_hypothesis(self, pred_price, house_feature):
         #eal_price = 1
         real_price = house_feature.iloc[self.N - 1]
@@ -60,16 +63,42 @@ class EGPM:
         self.wp = np.array([self.wp[i] * mul_wp[i] for i in range(self.N)] * (self.U / normalizer))
         self.wm = np.array([self.wm[i] * mul_wm[i] for i in range(self.N)] * (self.U / normalizer))
 
+    # the actual algorithm
     def algo(self):
+        # mean_squared_error at each round
+        mse_list = list()
+        # list of prices predicted
         pred_price_list = list()
         for itr in range(self.NUM_SAMPLES):
+        #for itr in range(500):
             house_feature = self.data.iloc[itr]
             pred_price = self.predicted_price(house_feature)
             pred_price_list.append(pred_price)
             # print (pred_price - house_feature.iloc[self.N - 1]) ** 2
             self.update_hypothesis(pred_price, house_feature)
 
-        print mean_squared_error(self.data.iloc[:, self.N - 1], pred_price_list)
+        # return mean_squared_error(self.data.iloc[:, self.N - 1], pred_price_list)
+        print (self.wp - self.wm)* self.U
+        return pred_price_list
+
+
+# How does the mse depend on eta
+def eta_effect():
+    temp = EGPM()
+    #mean-squared-error list
+    mse = list()
+
+    for eta in np.linspace(pow(10,-3), 3.36*pow(10,-3), 10):
+        temp.eta = eta
+        pred_price_list = temp.algo()
+        mse.append(mean_squared_error(temp.data.iloc[:, temp.N - 1], pred_price_list))
+
+    batch_error = temp.batch_algo()
+    be_list = batch_error * np.ones(len(mse))
+    plt.plot(mse)
+    plt.plot(be_list)
+    plt.show()
+
 
 temp = EGPM()
 temp.algo()
