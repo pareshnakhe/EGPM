@@ -20,7 +20,7 @@ class EGPM:
         # eta: step size
         self.eta = 0.001
         # U: max l1 norm of weight vectors
-        self.U = 0.5
+        self.U = 10
 
         #scaling all columns so that vals are in [0,1]
         min_max_scaler = preprocessing.MinMaxScaler()
@@ -34,19 +34,24 @@ class EGPM:
         self.N = self.wm = self.wp = 0
 
 
-    def initialize(self):
-        self.N = self.data.shape[1]
-        # plt.hist(self.data.iloc[:, self.N - 1], color='blue')
-        self.wm = self.wp = 1.0 / (2 * (self.N - 1)) * np.ones(self.N - 1)
-
-
     def poly_initialize(self):
         X = self.data.iloc[:, range(self.NUM_FEATURES - 1)]
+        # http://scikit-learn.org/stable/modules/linear_model.html#polynomial-regression-extending-linear-models-with-basis-functions
         poly = PolynomialFeatures(degree=2)
         X = poly.fit_transform(X)
+        # print X.shape
 
-        self.N = X.shape[1]
-        #print self.N
+        y = self.data.as_matrix(columns=self.data.columns[self.N - 1:])
+        # print y.shape
+
+        temp = np.append(X, y, axis=1)
+        # print temp.shape
+
+        self.data = pd.DataFrame(temp)
+        # print self.data.shape
+
+        self.N = self.data.shape[1]
+        # print self.N
         self.wm = self.wp = 1.0 / (2 * (self.N - 1)) * np.ones(self.N - 1)
 
 
@@ -56,10 +61,11 @@ class EGPM:
         X = self.data.iloc[:, range(self.N - 1)]
         y_actual = self.data.iloc[:, self.N - 1]
         model = lr.fit(X, y_actual)
-        print lr.coef_
+        # print lr.coef_
 
         y_pred = model.predict(X)
         batch_error = mean_squared_error(y_actual, y_pred)
+        print batch_error
         return batch_error
 
     def predicted_price(self, house_feature):
@@ -81,7 +87,7 @@ class EGPM:
 
     # the actual algorithm
     def algo(self):
-        self.initialize()
+        self.poly_initialize()
 
         # mean_squared_error at each round
         mse_list = list()
@@ -94,8 +100,8 @@ class EGPM:
             # print (pred_price - house_feature.iloc[self.N - 1]) ** 2
             self.update_hypothesis(pred_price, house_feature)
 
-        # return mean_squared_error(self.data.iloc[:, self.N - 1], pred_price_list)
-        print (self.wp - self.wm)* self.U
+        print mean_squared_error(self.data.iloc[:, self.N - 1], pred_price_list)
+        # print (self.wp - self.wm)* self.U
         return pred_price_list
 
 
@@ -106,7 +112,7 @@ def eta_effect():
     # mean-squared-error list
     mse = list()
 
-    for eta in np.linspace(pow(10,-2), 5*pow(10,-1), 10):
+    for eta in np.linspace(pow(10,-3), pow(10,-2), 6):
         temp.eta = eta
         pred_price_list = temp.algo()
         mse.append(mean_squared_error(temp.data.iloc[:, temp.N - 1], pred_price_list))
@@ -118,24 +124,7 @@ def eta_effect():
     plt.show()
 
 
-temp = EGPM()
-temp.poly_initialize()
+eta_effect()
+# temp = EGPM()
 # temp.algo()
 # temp.batch_algo()
-
-# data = pd.read_csv('train.csv')
-# #
-# house1 = data.iloc[:2]
-# print house1.iloc[:,80]
-# print house1.iloc[:, house1.shape[1]-1]
-# print data.shape[0]
-
-
-# df = pd.read_csv('train.csv')
-# df = df.select_dtypes(include=[np.number]).interpolate()
-#
-# x = df.values #returns a numpy array
-# min_max_scaler = preprocessing.MinMaxScaler()
-# x_scaled = min_max_scaler.fit_transform(x)
-# df = pd.DataFrame(x_scaled)
-# print df.iloc[:2]
